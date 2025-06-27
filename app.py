@@ -345,6 +345,21 @@ def update_dns_record(config_id):
 # Маршруты авторизации
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Принудительная проверка и создание таблиц
+    try:
+        # Пытаемся выполнить простой запрос к таблице user
+        User.query.first()
+    except Exception as e:
+        print(f"Таблицы не найдены, создаем принудительно: {e}")
+        try:
+            db.drop_all()  # Удаляем все таблицы
+            db.create_all()  # Создаем заново
+            create_default_user()  # Создаем админа
+            print("Таблицы пересозданы успешно")
+        except Exception as e2:
+            print(f"Ошибка пересоздания таблиц: {e2}")
+            return f"Ошибка базы данных: {e2}", 500
+    
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -391,6 +406,44 @@ def health_check():
             'timestamp': datetime.utcnow().isoformat(),
             'error': str(e)
         }), 503
+
+@app.route('/debug-db')
+def debug_db():
+    """Диагностика базы данных"""
+    try:
+        inspector = db.inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        db_info = {
+            'database_uri': app.config['SQLALCHEMY_DATABASE_URI'],
+            'tables': tables,
+            'instance_path': instance_path,
+            'db_file_exists': os.path.exists(os.path.join(instance_path, 'dns_manager.db'))
+        }
+        
+        if 'user' in tables:
+            user_count = User.query.count()
+            db_info['user_count'] = user_count
+        
+        return jsonify(db_info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/init-db')
+def init_db_route():
+    """Принудительная инициализация базы данных"""
+    try:
+        db.drop_all()
+        db.create_all()
+        create_default_user()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'База данных инициализирована',
+            'tables_created': db.inspect(db.engine).get_table_names()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Маршруты веб-интерфейса
 @app.route('/')

@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('edit') }} {{ config.domain }} - {{ t('dns_manager') }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-edit me-2"></i>Редактировать DNS конфигурацию
+                </h3>
+                <small class="text-muted">
+                    {% if config.subdomain %}
+                        {{ config.subdomain }}.{{ config.domain }}
+                    {% else %}
+                        {{ config.domain }}
+                    {% endif %}
+                </small>
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="mb-3">
+                        <label for="token_id" class="form-label">
+                            <i class="fas fa-key me-1"></i>{{ t('cloudflare_token') }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="token_id" name="token_id" required>
+                            {% for token in tokens %}
+                            <option value="{{ token.id }}" {{ 'selected' if token.id == config.token_id else '' }}>
+                                {{ token.name }} ({{ token.get_domains()|length }} {{ t('domains_count').lower() }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text d-flex justify-content-between">
+                            <span>{{ t('get_token_help') }}</span>
+                            <a href="{{ url_for('settings') }}" class="text-decoration-none">
+                                <i class="fas fa-cog me-1"></i>{{ t('settings') }}
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="domain" class="form-label">
+                            <i class="fas fa-globe me-1"></i>Домен
+                            <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="domain" name="domain" required>
+                            <option value="{{ config.domain }}" selected>{{ config.domain }}</option>
+                        </select>
+                        <div class="form-text">Выберите домен из вашего аккаунта Cloudflare</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="subdomain" class="form-label">
+                            <i class="fas fa-sitemap me-1"></i>Поддомен (необязательно)
+                        </label>
+                        <input type="text" class="form-control" id="subdomain" name="subdomain" 
+                               value="{{ config.subdomain or '' }}" placeholder="api, www, mail и т.д.">
+                        <div class="form-text">Оставьте пустым для корневого домена</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="update_interval" class="form-label">
+                            <i class="fas fa-clock me-1"></i>Интервал обновления (минуты)
+                        </label>
+                        <input type="number" class="form-control" id="update_interval" name="update_interval" 
+                               value="{{ config.update_interval }}" min="5" max="1440">
+                        <div class="form-text">От 5 до 1440 минут (24 часа)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="ddns_url" class="form-label">
+                            <i class="fas fa-link me-1"></i>DDNS URL (необязательно)
+                        </label>
+                        <input type="url" class="form-control" id="ddns_url" name="ddns_url" 
+                               value="{{ config.ddns_url or '' }}" 
+                               placeholder="https://your-server.com/ip или http://192.168.1.100/ip">
+                        <div class="form-text">
+                            URL для получения IP с другого сервера. Если не указан, будет использоваться IP текущего сервера
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                                   {{ 'checked' if config.is_active else '' }}>
+                            <label class="form-check-label" for="is_active">
+                                <i class="fas fa-power-off me-1"></i>Активная конфигурация
+                            </label>
+                        </div>
+                        <div class="form-text">Отключите для временной остановки автообновления</div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <strong>Текущий IP:</strong><br>
+                                <code>{{ config.last_ip or 'Не определен' }}</code>
+                            </div>
+                            <div class="col-sm-6">
+                                <strong>Последнее обновление:</strong><br>
+                                <span class="timestamp" data-timestamp="{{ config.last_update }}">
+                                    {{ config.last_update.strftime('%d.%m.%Y %H:%M') if config.last_update else 'Никогда' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" form="configForm">
+                        <i class="fas fa-save me-2"></i>Сохранить изменения
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="updateNow()">
+                        <i class="fas fa-sync-alt me-2"></i>Обновить сейчас
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Назад
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary ms-auto" onclick="testConnection()">
+                        <i class="fas fa-flask me-2"></i>Тест
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const configId = {{ config.id }};
+
+// Загрузка доменов при изменении токена
+document.getElementById('cloudflare_token').addEventListener('input', function() {
+    const token = this.value.trim();
+    const domainSelect = document.getElementById('domain');
+    const currentDomain = "{{ config.domain }}";
+    
+    if (token.length > 20) {
+        fetch(`/api/zones/${encodeURIComponent(token)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    domainSelect.innerHTML = '';
+                    data.forEach(zone => {
+                        const option = document.createElement('option');
+                        option.value = zone.name;
+                        option.textContent = zone.name;
+                        option.selected = zone.name === currentDomain;
+                        domainSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                showNotification('Ошибка при загрузке доменов', 'danger');
+            });
+    }
+});
+
+// Отправка формы
+document.getElementById('configForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Обрабатываем checkbox
+    data.is_active = formData.has('is_active');
+    
+    // Очищаем пустые поля
+    Object.keys(data).forEach(key => {
+        if (data[key] === '' && key !== 'is_active') {
+            delete data[key];
+        }
+    });
+    
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Сохранение...';
+    
+    fetch(`/api/configs/${configId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification('Конфигурация успешно обновлена!', 'success');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка при обновлении конфигурации', 'danger');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-save me-2"></i>Сохранить изменения';
+    });
+});
+
+// Обновить DNS запись сейчас
+function updateNow() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Обновление...';
+    
+    fetch(`/api/configs/${configId}/update`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification(data.message, 'success');
+            setTimeout(() => location.reload(), 2000);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка при обновлении DNS записи', 'danger');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Обновить сейчас';
+    });
+}
+
+// Тестирование подключения
+function testConnection() {
+    const token = document.getElementById('cloudflare_token').value.trim();
+    const ddnsUrl = document.getElementById('ddns_url').value.trim();
+    
+    if (!token) {
+        showNotification('Введите Cloudflare токен для тестирования', 'warning');
+        return;
+    }
+    
+    const testBtn = event.target;
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Тестирование...';
+    
+    fetch(`/api/zones/${encodeURIComponent(token)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification('Ошибка подключения к Cloudflare: ' + data.error, 'danger');
+            } else {
+                showNotification(`Cloudflare: Найдено ${data.length} доменов`, 'success');
+                
+                if (ddnsUrl) {
+                    // Здесь можно добавить тест DDNS URL
+                    showNotification('DDNS URL будет протестирован при следующем обновлении', 'info');
+                }
+            }
+        })
+        .catch(error => {
+            showNotification('Ошибка при тестировании подключения', 'danger');
+        })
+        .finally(() => {
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="fas fa-flask me-2"></i>Тест';
+        });
+}
+
+// Загружаем домены при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const token = document.getElementById('cloudflare_token').value.trim();
+    if (token) {
+        document.getElementById('cloudflare_token').dispatchEvent(new Event('input'));
+    }
+});
+</script>
+{% endblock %} 

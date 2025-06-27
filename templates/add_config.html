@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('add_domain') }} - {{ t('dns_manager') }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                                    <h3 class="card-title mb-0">
+                        <i class="fas fa-plus me-2"></i>{{ t('add_dns_config') }}
+                    </h3>
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="mb-3">
+                        <label for="token_id" class="form-label">
+                            <i class="fas fa-key me-1"></i>{{ t('cloudflare_token') }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        {% if tokens %}
+                        <select class="form-select" id="token_id" name="token_id" required>
+                            <option value="">{{ t('select_token') }}</option>
+                            {% for token in tokens %}
+                            <option value="{{ token.id }}">{{ token.name }} ({{ token.get_domains()|length }} {{ t('domains_count').lower() }})</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <div class="alert alert-warning d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <div>
+                                {{ t('no_tokens') }} - <a href="{{ url_for('settings') }}" class="alert-link">{{ t('add_first_token') }}</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="form-text d-flex justify-content-between">
+                            <span>{{ t('get_token_help') }}</span>
+                            <a href="{{ url_for('settings') }}" class="text-decoration-none">
+                                <i class="fas fa-plus me-1"></i>{{ t('add_token') }}
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="domain" class="form-label">
+                            <i class="fas fa-globe me-1"></i>{{ t('domain') }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="domain" name="domain" required disabled>
+                            <option value="">{{ t('enter_token_first') }}</option>
+                        </select>
+                        <div class="form-text">{{ t('select_domain_from_account') }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="subdomain" class="form-label">
+                            <i class="fas fa-sitemap me-1"></i>Поддомен (необязательно)
+                        </label>
+                        <input type="text" class="form-control" id="subdomain" name="subdomain" 
+                               placeholder="api, www, mail и т.д.">
+                        <div class="form-text">Оставьте пустым для корневого домена</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="update_interval" class="form-label">
+                            <i class="fas fa-clock me-1"></i>Интервал обновления (минуты)
+                        </label>
+                        <input type="number" class="form-control" id="update_interval" name="update_interval" 
+                               value="30" min="5" max="1440">
+                        <div class="form-text">От 5 до 1440 минут (24 часа)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="ddns_url" class="form-label">
+                            <i class="fas fa-link me-1"></i>DDNS URL (необязательно)
+                        </label>
+                        <input type="url" class="form-control" id="ddns_url" name="ddns_url" 
+                               placeholder="https://your-server.com/ip или http://192.168.1.100/ip">
+                        <div class="form-text">
+                            URL для получения IP с другого сервера. Если не указан, будет использоваться IP текущего сервера
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Совет:</strong> Для DDNS URL сервер должен возвращать IP адрес в виде текста или JSON 
+                        с полями "ip" или "address".
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" form="configForm">
+                        <i class="fas fa-save me-2"></i>Сохранить
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-times me-2"></i>Отмена
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary ms-auto" onclick="testConnection()">
+                        <i class="fas fa-flask me-2"></i>Тест
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Загрузка доменов при выборе токена
+document.getElementById('token_id').addEventListener('change', function() {
+    const tokenId = this.value;
+    const domainSelect = document.getElementById('domain');
+    
+    if (tokenId) {
+        domainSelect.disabled = true;
+        domainSelect.innerHTML = '<option value="">Загрузка доменов...</option>';
+        
+        fetch(`/api/zones/${tokenId}`)
+            .then(response => response.json())
+            .then(data => {
+                domainSelect.innerHTML = '<option value="">Выберите домен</option>';
+                
+                if (data.error) {
+                    domainSelect.innerHTML = '<option value="">Ошибка загрузки доменов</option>';
+                    showNotification(data.error, 'danger');
+                } else {
+                    data.forEach(zone => {
+                        const option = document.createElement('option');
+                        option.value = zone.name;
+                        option.textContent = zone.name;
+                        domainSelect.appendChild(option);
+                    });
+                    domainSelect.disabled = false;
+                }
+            })
+            .catch(error => {
+                domainSelect.innerHTML = '<option value="">Ошибка загрузки доменов</option>';
+                showNotification('Ошибка при проверке токена', 'danger');
+            });
+    } else {
+        domainSelect.disabled = true;
+        domainSelect.innerHTML = '<option value="">Сначала выберите токен</option>';
+    }
+});
+
+// Отправка формы
+document.getElementById('configForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Очищаем пустые поля
+    Object.keys(data).forEach(key => {
+        if (data[key] === '') {
+            delete data[key];
+        }
+    });
+    
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Сохранение...';
+    
+    fetch('/api/configs', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification('Конфигурация успешно создана!', 'success');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка при создании конфигурации', 'danger');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-save me-2"></i>Сохранить';
+    });
+});
+
+// Тестирование подключения
+function testConnection() {
+    const tokenId = document.getElementById('token_id').value;
+    const ddnsUrl = document.getElementById('ddns_url').value.trim();
+    
+    if (!tokenId) {
+        showNotification('Выберите Cloudflare токен для тестирования', 'warning');
+        return;
+    }
+    
+    const testBtn = event.target;
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Тестирование...';
+    
+    // Тестируем доступ к Cloudflare
+    fetch(`/api/zones/${tokenId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification('Ошибка подключения к Cloudflare: ' + data.error, 'danger');
+            } else {
+                showNotification(`Cloudflare: Найдено ${data.length} доменов`, 'success');
+                
+                // Если есть DDNS URL, тестируем его
+                if (ddnsUrl) {
+                    fetch('/api/test-ddns', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ddns_url: ddnsUrl })
+                    })
+                    .then(response => response.json())
+                    .then(ddnsData => {
+                        if (ddnsData.error) {
+                            showNotification('DDNS тест не прошел: ' + ddnsData.error, 'warning');
+                        } else {
+                            showNotification(`DDNS тест успешен: IP ${ddnsData.ip}`, 'success');
+                        }
+                    });
+                }
+            }
+        })
+        .catch(error => {
+            showNotification('Ошибка при тестировании подключения', 'danger');
+        })
+        .finally(() => {
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="fas fa-flask me-2"></i>Тест';
+        });
+}
+</script>
+{% endblock %} 

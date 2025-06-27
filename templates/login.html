@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('login_title') }} - {{ t('dns_manager') }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(14, 165, 233, 0.1);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 380px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .login-header i {
+            font-size: 2.5rem;
+            color: #0ea5e9;
+            margin-bottom: 1rem;
+        }
+        .form-floating {
+            margin-bottom: 1rem;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            border-radius: 8px;
+            background: #0ea5e9;
+            border: 1px solid #0ea5e9;
+            color: white;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        .btn-login:hover {
+            background: #0284c7;
+            border-color: #0284c7;
+            transform: translateY(-1px);
+            color: white;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        .default-creds {
+            background: rgba(14, 165, 233, 0.05);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+        }
+        .default-creds strong {
+            color: #0284c7;
+        }
+        .alert {
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <i class="fas fa-globe"></i>
+            <h2 class="fw-bold">{{ t('dns_manager') }}</h2>
+            <p class="text-muted">{{ t('login_subtitle') }}</p>
+        </div>
+        
+        <!-- Переключатель языка -->
+        <div class="text-center mb-3">
+            <div class="btn-group btn-group-sm" role="group">
+                {% for lang_code, lang_name in get_available_languages().items() %}
+                <a href="{{ url_for('set_language_route', lang=lang_code) }}" 
+                   class="btn {% if lang_code == get_current_language() %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    {{ lang_name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="form-floating">
+                <input type="text" class="form-control" id="username" name="username" 
+                       placeholder="{{ t('username') }}" required>
+                <label for="username">
+                    <i class="fas fa-user me-2"></i>{{ t('username') }}
+                </label>
+            </div>
+
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="{{ t('password') }}" required>
+                <label for="password">
+                    <i class="fas fa-lock me-2"></i>{{ t('password') }}
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-login">
+                <i class="fas fa-sign-in-alt me-2"></i>{{ t('login') }}
+            </button>
+        </form>
+
+        <div class="default-creds">
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-info-circle me-2 text-primary"></i>
+                <strong>{{ t('default_credentials') }}</strong>
+            </div>
+            <div class="row">
+                <div class="col-6">
+                    <small>{{ t('username') }}: <code>admin</code></small>
+                </div>
+                <div class="col-6">
+                    <small>{{ t('password') }}: <code>admin123</code></small>
+                </div>
+            </div>
+            <small class="text-muted mt-2 d-block">
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                {{ t('change_password_warning') }}
+            </small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

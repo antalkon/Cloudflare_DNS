@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('home') }} - {{ t('dns_manager') }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-globe me-2"></i>{{ t('dns_configurations') }}</h1>
+    <a href="{{ url_for('add_config') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>{{ t('add_domain') }}
+    </a>
+</div>
+
+{% if configs %}
+    <div class="row">
+        {% for config in configs %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="domain-info">
+                        {% if config.subdomain %}
+                            {{ config.subdomain }}.{{ config.domain }}
+                        {% else %}
+                            {{ config.domain }}
+                        {% endif %}
+                    </span>
+                    <span class="status-{{ 'active' if config.is_active else 'inactive' }}">
+                        <i class="fas fa-{{ 'play' if config.is_active else 'pause' }}"></i>
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <small class="text-muted">{{ t('current_ip') }}</small><br>
+                        <code>{{ config.last_ip or t('not_determined') }}</code>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">{{ t('update_interval') }}</small><br>
+                        <span class="badge bg-secondary">{{ config.update_interval }} {{ t('minutes') }}</span>
+                    </div>
+                    {% if config.ddns_url %}
+                    <div class="mb-2">
+                        <small class="text-muted">{{ t('ddns_source') }}</small><br>
+                        <span class="badge bg-info">{{ t('enabled') }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="mb-2">
+                        <small class="text-muted">{{ t('last_update') }}</small><br>
+                        <span class="timestamp last-update" data-timestamp="{{ config.last_update }}">
+                            {{ config.last_update.strftime('%d.%m.%Y %H:%M') if config.last_update else t('never') }}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-outline-success btn-sm" onclick="updateDNS({{ config.id }})" title="{{ t('update_now') }}">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <a href="{{ url_for('edit_config', config_id=config.id) }}" class="btn btn-outline-primary btn-sm" title="{{ t('edit') }}">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button class="btn btn-outline-{{ 'warning' if config.is_active else 'success' }} btn-sm" 
+                                onclick="toggleConfig({{ config.id }}, {{ config.is_active|lower }})" 
+                                title="{{ t('stop') if config.is_active else t('start') }}">
+                            <i class="fas fa-{{ 'pause' if config.is_active else 'play' }}"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteConfig({{ config.id }})" title="{{ t('delete') }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fas fa-globe fa-4x text-muted"></i>
+        </div>
+        <h3 class="text-muted">{{ t('no_configurations') }}</h3>
+        <p class="text-muted mb-4">{{ t('add_first_config') }}</p>
+        <a href="{{ url_for('add_config') }}" class="btn btn-primary btn-lg">
+            <i class="fas fa-plus me-2"></i>{{ t('add_domain') }}
+        </a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Обновление DNS записи
+function updateDNS(configId) {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    fetch(`/api/configs/${configId}/update`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification(data.message, 'success');
+            // Перезагружаем страницу через 2 секунды для обновления данных
+            setTimeout(() => location.reload(), 2000);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка при обновлении DNS записи', 'danger');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+    });
+}
+
+// Переключение состояния конфигурации
+function toggleConfig(configId, isActive) {
+    const newState = !isActive;
+    
+    fetch(`/api/configs/${configId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ is_active: newState })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification(
+                `Конфигурация ${newState ? 'запущена' : 'остановлена'}`, 
+                'success'
+            );
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка при изменении состояния', 'danger');
+    });
+}
+
+// Удаление конфигурации
+function deleteConfig(configId) {
+    if (!confirm('Вы уверены, что хотите удалить эту конфигурацию?')) {
+        return;
+    }
+    
+    fetch(`/api/configs/${configId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification('Конфигурация удалена', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка при удалении конфигурации', 'danger');
+    });
+}
+
+// Автообновление страницы каждые 30 секунд
+setInterval(() => {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %} 

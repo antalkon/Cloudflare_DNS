@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ t('dns_manager') }}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0ea5e9;
+            --primary-light: #38bdf8;
+            --primary-dark: #0284c7;
+            --secondary-color: #06b6d4;
+            --accent-color: #67e8f9;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --card-shadow-hover: 0 4px 12px rgba(14,165,233,0.15);
+            --border-radius: 8px;
+            --border-color: #e2e8f0;
+        }
+        
+        body {
+            background-color: var(--background);
+            color: #334155;
+        }
+        
+        .navbar {
+            background: var(--primary-color) !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: none;
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.3rem;
+        }
+        
+        .navbar-nav .nav-link {
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            transform: translateY(-1px);
+        }
+        
+        .status-active {
+            color: #28a745;
+        }
+        .status-inactive {
+            color: #dc3545;
+        }
+        
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            transition: all 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow-hover);
+            border-color: var(--primary-light);
+        }
+        
+        .card-header {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .btn {
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        
+        .last-update {
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+        
+        .domain-info {
+            font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+            background: rgba(14, 165, 233, 0.1);
+            color: var(--primary-dark);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--border-radius);
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+        
+        .form-control, .form-select {
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            background-color: var(--surface);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.1);
+            background-color: var(--surface);
+        }
+        
+        .alert {
+            border: 1px solid;
+            border-radius: var(--border-radius);
+        }
+        
+        .alert-info {
+            background-color: rgba(14, 165, 233, 0.1);
+            border-color: rgba(14, 165, 233, 0.2);
+            color: var(--primary-dark);
+        }
+        
+        .badge {
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+        
+        /* Мобильная оптимизация */
+        @media (max-width: 768px) {
+            .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            
+            .card {
+                margin-bottom: 1rem;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .btn-group .btn {
+                border-radius: 8px !important;
+            }
+            
+            .domain-info {
+                font-size: 0.8em;
+                word-break: break-all;
+            }
+            
+            .navbar-nav {
+                text-align: center;
+                padding-top: 1rem;
+            }
+            
+            .navbar-toggler {
+                border: none;
+                padding: 0.25rem 0.5rem;
+            }
+            
+            .navbar-toggler:focus {
+                box-shadow: none;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+            
+            .btn-group-vertical .btn {
+                margin-bottom: 0.5rem;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .btn-group {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+            }
+            
+            .btn-group .btn:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+        
+        /* Анимации */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* Кастомные скроллбары */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* Дополнительные стили для улучшения UX */
+        .loading {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') if session.user_id else url_for('login') }}">
+                <i class="fas fa-globe me-2"></i>
+                {{ t('dns_manager') }}
+            </a>
+            
+            {% if session.user_id %}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i>
+                            <span class="d-lg-inline d-none">{{ t('home') }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('add_config') }}">
+                            <i class="fas fa-plus me-1"></i>
+                            <span class="d-lg-inline d-none">{{ t('add') }}</span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <!-- Переключатель языка -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-language me-1"></i>
+                            <span class="d-lg-inline d-none">{{ get_available_languages()[get_current_language()] }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            {% for lang_code, lang_name in get_available_languages().items() %}
+                            <li>
+                                <a class="dropdown-item {% if lang_code == get_current_language() %}active{% endif %}" 
+                                   href="{{ url_for('set_language_route', lang=lang_code) }}">
+                                    {{ lang_name }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    
+                    <!-- Меню пользователя -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            {{ session.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('settings') }}">
+                                    <i class="fas fa-cog me-2"></i>{{ t('settings') }}
+                                </a>
+                            </li>
+                            {% if session.is_admin %}
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('users') }}">
+                                    <i class="fas fa-users me-2"></i>{{ t('users') }}
+                                </a>
+                            </li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>{{ t('logout') }}
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="bg-light mt-5 py-3">
+        <div class="container text-center text-muted">
+            <small>{{ t('dns_manager') }} - {{ t('login_subtitle') }}</small>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Функция для форматирования даты
+        function formatDate(dateString) {
+            if (!dateString) return 'Никогда';
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU');
+        }
+
+        // Функция для обновления времени на странице
+        function updateTimestamps() {
+            document.querySelectorAll('.timestamp').forEach(elem => {
+                const timestamp = elem.dataset.timestamp;
+                if (timestamp) {
+                    elem.textContent = formatDate(timestamp);
+                }
+            });
+        }
+
+        // Обновляем временные метки при загрузке
+        document.addEventListener('DOMContentLoaded', updateTimestamps);
+
+        // Показываем уведомления
+        function showNotification(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // Автоматически скрываем через 5 секунд
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

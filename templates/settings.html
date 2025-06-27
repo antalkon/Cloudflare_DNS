@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки - Cloudflare DNS Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-cog me-2"></i>Настройки</h1>
+</div>
+
+<!-- Cloudflare Токены -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-key me-2"></i>Cloudflare API Токены
+                </h5>
+                <button class="btn btn-light btn-sm" onclick="showAddTokenModal()">
+                    <i class="fas fa-plus me-1"></i>Добавить токен
+                </button>
+            </div>
+            <div class="card-body">
+                {% if tokens %}
+                    <div class="row" id="tokensContainer">
+                        {% for token in tokens %}
+                        <div class="col-md-6 col-lg-4 mb-3" data-token-id="{{ token.id }}">
+                            <div class="card border">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title">{{ token.name }}</h6>
+                                        <span class="badge bg-{{ 'success' if token.is_active else 'secondary' }}">
+                                            {{ 'Активен' if token.is_active else 'Неактивен' }}
+                                        </span>
+                                    </div>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            Создан: {{ token.created_at.strftime('%d.%m.%Y') }}<br>
+                                            Доменов: <span class="domains-count">{{ token.get_domains()|length }}</span>
+                                        </small>
+                                    </p>
+                                    <div class="btn-group w-100" role="group">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="editToken({{ token.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm" onclick="testToken({{ token.id }})">
+                                            <i class="fas fa-flask"></i>
+                                        </button>
+                                        <button class="btn btn-outline-{{ 'warning' if token.is_active else 'success' }} btn-sm" 
+                                                onclick="toggleToken({{ token.id }}, {{ token.is_active|lower }})">
+                                            <i class="fas fa-{{ 'pause' if token.is_active else 'play' }}"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteToken({{ token.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-key fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Нет токенов</h5>
+                        <p class="text-muted">Добавьте Cloudflare API токен для начала работы</p>
+                        <button class="btn btn-primary" onclick="showAddTokenModal()">
+                            <i class="fas fa-plus me-2"></i>Добавить первый токен
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Профиль пользователя -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-user me-2"></i>Профиль пользователя
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="profileForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Имя пользователя</label>
+                                <input type="text" class="form-control" id="username" value="{{ user.username }}" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="user_type" class="form-label">Тип пользователя</label>
+                                <input type="text" class="form-control" id="user_type" 
+                                       value="{{ 'Администратор' if user.is_admin else 'Пользователь' }}" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="new_password" class="form-label">Новый пароль</label>
+                                <input type="password" class="form-control" id="new_password" 
+                                       placeholder="Оставьте пустым для сохранения текущего">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="confirm_password" class="form-label">Подтвердите пароль</label>
+                                <input type="password" class="form-control" id="confirm_password" 
+                                       placeholder="Повторите новый пароль">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Сохранить изменения
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления/редактирования токена -->
+<div class="modal fade" id="tokenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tokenModalTitle">Добавить токен</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="tokenForm">
+                    <input type="hidden" id="tokenId">
+                    <div class="mb-3">
+                        <label for="tokenName" class="form-label">Название токена</label>
+                        <input type="text" class="form-control" id="tokenName" required 
+                               placeholder="Например: Основной токен">
+                    </div>
+                    <div class="mb-3">
+                        <label for="tokenValue" class="form-label">API токен</label>
+                        <input type="password" class="form-control" id="tokenValue" required 
+                               placeholder="Cloudflare API токен">
+                        <div class="form-text">
+                            Получите токен в <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">панели Cloudflare</a>
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="tokenActive" checked>
+                        <label class="form-check-label" for="tokenActive">
+                            Активный токен
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveToken()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let tokenModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    tokenModal = new bootstrap.Modal(document.getElementById('tokenModal'));
+});
+
+// Показать модальное окно для добавления токена
+function showAddTokenModal() {
+    document.getElementById('tokenModalTitle').textContent = 'Добавить токен';
+    document.getElementById('tokenForm').reset();
+    document.getElementById('tokenId').value = '';
+    document.getElementById('tokenActive').checked = true;
+    tokenModal.show();
+}
+
+// Редактировать токен
+function editToken(tokenId) {
+    // Получаем данные токена
+    fetch(`/api/tokens`)
+        .then(response => response.json())
+        .then(tokens => {
+            const token = tokens.find(t => t.id === tokenId);
+            if (token) {
+                document.getElementById('tokenModalTitle').textContent = 'Редактировать токен';
+                document.getElementById('tokenId').value = token.id;
+                document.getElementById('tokenName').value = token.name;
+                document.getElementById('tokenValue').value = '';
+                document.getElementById('tokenActive').checked = token.is_active;
+                tokenModal.show();
+            }
+        })
+        .catch(error => showNotification('Ошибка загрузки данных токена', 'danger'));
+}
+
+// Сохранить токен
+function saveToken() {
+    const tokenId = document.getElementById('tokenId').value;
+    const isEdit = tokenId !== '';
+    
+    const data = {
+        name: document.getElementById('tokenName').value,
+        is_active: document.getElementById('tokenActive').checked
+    };
+    
+    const tokenValue = document.getElementById('tokenValue').value;
+    if (tokenValue || !isEdit) {
+        data.token = tokenValue;
+    }
+    
+    const url = isEdit ? `/api/tokens/${tokenId}` : '/api/tokens';
+    const method = isEdit ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification(
+                isEdit ? 'Токен обновлен!' : 'Токен добавлен!', 
+                'success'
+            );
+            tokenModal.hide();
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => showNotification('Ошибка при сохранении токена', 'danger'));
+}
+
+// Переключить состояние токена
+function toggleToken(tokenId, isActive) {
+    const newState = !isActive;
+    
+    fetch(`/api/tokens/${tokenId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: newState })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification(
+                `Токен ${newState ? 'активирован' : 'деактивирован'}`, 
+                'success'
+            );
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => showNotification('Ошибка при изменении состояния', 'danger'));
+}
+
+// Тестировать токен
+function testToken(tokenId) {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    fetch(`/api/zones/${tokenId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification('Ошибка токена: ' + data.error, 'danger');
+            } else {
+                showNotification(`Токен работает! Найдено доменов: ${data.length}`, 'success');
+                // Обновляем счетчик доменов
+                const card = btn.closest('[data-token-id]');
+                const domainsSpan = card.querySelector('.domains-count');
+                if (domainsSpan) domainsSpan.textContent = data.length;
+            }
+        })
+        .catch(error => showNotification('Ошибка при тестировании токена', 'danger'))
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-flask"></i>';
+        });
+}
+
+// Удалить токен
+function deleteToken(tokenId) {
+    if (!confirm('Вы уверены, что хотите удалить этот токен?')) return;
+    
+    fetch(`/api/tokens/${tokenId}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification(data.error, 'danger');
+            } else {
+                showNotification('Токен удален', 'success');
+                setTimeout(() => location.reload(), 1000);
+            }
+        })
+        .catch(error => showNotification('Ошибка при удалении токена', 'danger'));
+}
+
+// Сохранить профиль
+document.getElementById('profileForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const newPassword = document.getElementById('new_password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    
+    if (newPassword && newPassword !== confirmPassword) {
+        showNotification('Пароли не совпадают', 'danger');
+        return;
+    }
+    
+    if (newPassword && newPassword.length < 6) {
+        showNotification('Пароль должен содержать минимум 6 символов', 'danger');
+        return;
+    }
+    
+    const data = {};
+    if (newPassword) {
+        data.password = newPassword;
+    }
+    
+    if (Object.keys(data).length === 0) {
+        showNotification('Нет изменений для сохранения', 'info');
+        return;
+    }
+    
+    fetch(`/api/users/{{ user.id }}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification('Профиль обновлен!', 'success');
+            document.getElementById('new_password').value = '';
+            document.getElementById('confirm_password').value = '';
+        }
+    })
+    .catch(error => showNotification('Ошибка при обновлении профиля', 'danger'));
+});
+</script>
+{% endblock %} 

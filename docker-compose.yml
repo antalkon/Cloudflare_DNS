@@ -4,7 +4,7 @@ services:
   cloudflare-dns:
     build: .
     ports:
-      - "5000:5000"
+      - "4545:4545"
     environment:
       - SECRET_KEY=your-super-secret-key-change-this
       - FLASK_ENV=production

@@ -23,7 +23,7 @@ ENV FLASK_ENV=production
 ENV SECRET_KEY=your-secret-key-change-this-in-production
 
 # Открытие порта
-EXPOSE 5000
+EXPOSE 4545
 
 # Команда запуска
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "app:app"] 
+CMD ["gunicorn", "--bind", "0.0.0.0:4545", "--workers", "1", "--timeout", "120", "app:app"] 

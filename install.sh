@@ -116,43 +116,16 @@ interactive_setup() {
     print_success "Настройки сохранены в .env"
 }
 
-# Выбор профилей
+# Выбор профилей (упрощено)
 select_profiles() {
-    print_info "Выберите дополнительные компоненты:"
-    
-    PROFILES=""
-    
-    read -p "Установить Nginx reverse proxy? (y/n) [n]: " USE_NGINX
-    if [[ $USE_NGINX =~ ^[Yy]$ ]]; then
-        PROFILES="$PROFILES nginx"
-        print_success "Nginx будет установлен"
-    fi
-    
-    read -p "Включить автообновления? (y/n) [n]: " USE_AUTOUPDATE
-    if [[ $USE_AUTOUPDATE =~ ^[Yy]$ ]]; then
-        PROFILES="$PROFILES auto-update"
-        print_success "Автообновления включены"
-    fi
-    
-    if [ -n "$PROFILES" ]; then
-        echo "COMPOSE_PROFILES=$PROFILES" >> .env
-    fi
+    print_info "Используется стандартная конфигурация без дополнительных компонентов"
 }
 
 # Запуск приложения
 start_application() {
     print_info "Запуск приложения..."
     
-    if [ -f .env ] && grep -q "COMPOSE_PROFILES" .env; then
-        PROFILES=$(grep COMPOSE_PROFILES .env | cut -d'=' -f2)
-        PROFILE_ARGS=""
-        for profile in $PROFILES; do
-            PROFILE_ARGS="$PROFILE_ARGS --profile $profile"
-        done
-        docker-compose $PROFILE_ARGS up -d
-    else
-        docker-compose up -d
-    fi
+    docker-compose up -d
     
     print_success "Приложение запущено!"
 }
@@ -183,9 +156,7 @@ show_info() {
     echo "  Остановка:         docker-compose down"
     echo "  Обновление:        docker-compose pull && docker-compose up -d"
     echo
-    if [ -f .env ]; then
-        print_info "Настройки сохранены в файле .env"
-    fi
+    print_info "Конфигурация сохранена в .env файле"
 }
 
 # Основная функция

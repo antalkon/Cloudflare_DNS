@@ -40,11 +40,8 @@ curl -sSL https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main
 # Скачать standalone конфигурацию
 wget https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
 
-# Запустить (базовая конфигурация)
+# Запустить
 docker-compose up -d
-
-# Или с дополнительными компонентами
-docker-compose --profile nginx --profile auto-update up -d
 ```
 
 ---
@@ -145,9 +142,6 @@ echo "DOMAIN_NAME=your-domain.com" >> .env
 
 # 3. Запустить
 docker-compose up -d
-
-# С дополнительными компонентами:
-docker-compose --profile nginx --profile auto-update up -d
 ```
 
 ### Docker Compose (Production)
@@ -200,9 +194,9 @@ mkdir cloudflare-dns && cd cloudflare-dns
 bash <(curl -s https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh)
 ```
 
-3. **Доступные профили:**
-- `nginx` - Nginx reverse proxy с SSL поддержкой
-- `auto-update` - Автоматическое обновление через Watchtower
+3. **Простая настройка:**
+- Порт 5000 для веб-интерфейса
+- Персистентное хранение данных
 
 4. **Управление:**
 ```bash

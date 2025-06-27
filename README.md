@@ -24,21 +24,21 @@
 **Один файл - вся система:**
 ```bash
 # Скачать и запустить автоматический установщик
-curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh | bash
 
 # Или с wget
-wget -qO- https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh | bash
 ```
 
 **Неинтерактивная установка:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash -s -- -y
+curl -sSL https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh | bash -s -- -y
 ```
 
 **Ручная установка через Docker Compose:**
 ```bash
 # Скачать standalone конфигурацию
-wget https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
 
 # Запустить (базовая конфигурация)
 docker-compose up -d
@@ -53,7 +53,7 @@ docker-compose --profile nginx --profile auto-update up -d
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/yourusername/cloudflare-dns-manager.git
+git clone https://github.com/antalkon/cloudflare-dns-manager.git
 cd cloudflare-dns-manager
 
 # Запустить с Docker Compose
@@ -95,7 +95,7 @@ python app.py
 
 1. **Клонировать репозиторий:**
 ```bash
-git clone https://github.com/yourusername/cloudflare-dns-manager.git
+git clone https://github.com/antalkon/cloudflare-dns-manager.git
 cd cloudflare-dns-manager
 ```
 
@@ -128,16 +128,16 @@ python app.py
 **Полностью автоматическая установка:**
 ```bash
 # Установка с интерактивным конфигуратором
-curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh | bash
 
 # Быстрая установка без вопросов
-curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash -s -- -y
+curl -sSL https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh | bash -s -- -y
 ```
 
 **Ручная установка:**
 ```bash
 # 1. Скачать конфигурацию
-wget https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
 
 # 2. Настроить переменные (опционально)
 echo "SECRET_KEY=$(openssl rand -hex 32)" > .env
@@ -197,7 +197,7 @@ mkdir cloudflare-dns && cd cloudflare-dns
 
 2. **Скачать и запустить:**
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/install.sh)
 ```
 
 3. **Доступные профили:**
@@ -442,7 +442,7 @@ docker restart cloudflare-dns-manager
 
 Если у вас есть вопросы или проблемы:
 
-1. Проверьте [Issues](https://github.com/yourusername/cloudflare-dns-manager/issues)
+1. Проверьте [Issues](https://github.com/antalkon/cloudflare-dns-manager/issues)
 2. Создайте новый Issue с подробным описанием
 3. Приложите логи и скриншоты если возможно
 

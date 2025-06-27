@@ -58,8 +58,8 @@ check_requirements() {
 download_config() {
     print_info "Загрузка конфигурации..."
     
-    # URL к вашему репозиторию (замените на актуальный)
-    CONFIG_URL="https://raw.githubusercontent.com/USERNAME/cloudflare-dns-manager/main/docker-compose.standalone.yml"
+    # URL к репозиторию
+    CONFIG_URL="https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager/main/docker-compose.standalone.yml"
     
     if command -v wget &> /dev/null; then
         wget -q -O docker-compose.yml "$CONFIG_URL" || {

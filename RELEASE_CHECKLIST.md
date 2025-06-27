@@ -49,7 +49,7 @@
 ## ⚠️ Что нужно сделать перед публикацией
 
 ### 1. Заменить placeholder'ы
-- [ ] В README.md заменить `yourusername` на реальный GitHub username
+- [x] В README.md заменить `yourusername` на реальный GitHub username (antalkon)
 - [ ] В GitHub Actions заменить `your-dockerhub-username`
 - [ ] Обновить ссылки на репозиторий
 

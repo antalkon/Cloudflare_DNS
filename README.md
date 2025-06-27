@@ -19,7 +19,37 @@
 
 ## 🚀 Быстрый старт
 
-### Docker (Рекомендуется)
+### 📦 Мгновенное развертывание (рекомендуется)
+
+**Один файл - вся система:**
+```bash
+# Скачать и запустить автоматический установщик
+curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash
+
+# Или с wget
+wget -qO- https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash
+```
+
+**Неинтерактивная установка:**
+```bash
+curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash -s -- -y
+```
+
+**Ручная установка через Docker Compose:**
+```bash
+# Скачать standalone конфигурацию
+wget https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
+
+# Запустить (базовая конфигурация)
+docker-compose up -d
+
+# Или с дополнительными компонентами
+docker-compose --profile nginx --profile auto-update up -d
+```
+
+---
+
+### 🔧 Разработка (Docker)
 
 ```bash
 # Клонировать репозиторий
@@ -30,15 +60,7 @@ cd cloudflare-dns-manager
 docker-compose up -d
 ```
 
-Приложение будет доступно по адресу: `http://localhost:5000`
-
-**Данные по умолчанию:**
-- Логин: `admin`
-- Пароль: `admin123`
-
-⚠️ **Обязательно смените пароль после первого входа!**
-
-### Ручная установка
+### 📋 Ручная установка
 
 1. **Установить зависимости:**
 ```bash
@@ -49,6 +71,16 @@ pip install -r requirements.txt
 ```bash
 python app.py
 ```
+
+---
+
+**Приложение будет доступно по адресу:** `http://localhost:5000`
+
+**Данные по умолчанию:**
+- Логин: `admin`
+- Пароль: `admin123`
+
+⚠️ **Обязательно смените пароль после первого входа!**
 
 ## 📖 Подробная установка
 
@@ -91,6 +123,33 @@ export FLASK_ENV="production"
 python app.py
 ```
 
+### Standalone развертывание на сервере
+
+**Полностью автоматическая установка:**
+```bash
+# Установка с интерактивным конфигуратором
+curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash
+
+# Быстрая установка без вопросов
+curl -sSL https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh | bash -s -- -y
+```
+
+**Ручная установка:**
+```bash
+# 1. Скачать конфигурацию
+wget https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/docker-compose.standalone.yml -O docker-compose.yml
+
+# 2. Настроить переменные (опционально)
+echo "SECRET_KEY=$(openssl rand -hex 32)" > .env
+echo "DOMAIN_NAME=your-domain.com" >> .env
+
+# 3. Запустить
+docker-compose up -d
+
+# С дополнительными компонентами:
+docker-compose --profile nginx --profile auto-update up -d
+```
+
 ### Docker Compose (Production)
 
 Создайте файл `docker-compose.prod.yml`:
@@ -125,6 +184,39 @@ volumes:
 Запуск:
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 🚀 Развертывание на сервере (один файл)
+
+Самый простой способ развернуть приложение на любом сервере с Docker:
+
+1. **Создать директорию:**
+```bash
+mkdir cloudflare-dns && cd cloudflare-dns
+```
+
+2. **Скачать и запустить:**
+```bash
+bash <(curl -s https://raw.githubusercontent.com/yourusername/cloudflare-dns-manager/main/install.sh)
+```
+
+3. **Доступные профили:**
+- `nginx` - Nginx reverse proxy с SSL поддержкой
+- `auto-update` - Автоматическое обновление через Watchtower
+
+4. **Управление:**
+```bash
+# Просмотр логов
+docker-compose logs -f
+
+# Остановка
+docker-compose down
+
+# Обновление
+docker-compose pull && docker-compose up -d
+
+# Полная очистка (ВНИМАНИЕ: удалит все данные)
+docker-compose down -v
 ```
 
 ## 🔧 Настройка

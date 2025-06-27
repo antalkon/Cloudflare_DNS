@@ -837,4 +837,4 @@ if __name__ == '__main__':
         create_default_user()
         init_scheduler()
     
-    app.run(host='0.0.0.0', port=4545, debug=True) 
+    app.run(host='0.0.0.0', port=4545, debug=False) 

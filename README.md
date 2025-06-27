@@ -71,7 +71,7 @@ python app.py
 
 ---
 
-**Приложение будет доступно по адресу:** `http://localhost:5000`
+**Приложение будет доступно по адресу:** `http://localhost:4545`
 
 **Данные по умолчанию:**
 - Логин: `admin`
@@ -157,7 +157,7 @@ services:
     container_name: cloudflare-dns-manager
     restart: unless-stopped
     ports:
-      - "80:5000"
+      - "80:4545"
     volumes:
       - ./data:/app/instance
     environment:
@@ -195,7 +195,7 @@ bash <(curl -s https://raw.githubusercontent.com/antalkon/cloudflare-dns-manager
 ```
 
 3. **Простая настройка:**
-- Порт 5000 для веб-интерфейса
+- Порт 4545 для веб-интерфейса
 - Персистентное хранение данных
 
 4. **Управление:**
@@ -317,7 +317,7 @@ docker build -t cloudflare-dns-manager .
 ```bash
 docker run -d \
   --name cloudflare-dns \
-  -p 5000:5000 \
+  -p 4545:4545 \
   -v $(pwd)/data:/app/instance \
   -e SECRET_KEY="your-secret-key" \
   cloudflare-dns-manager

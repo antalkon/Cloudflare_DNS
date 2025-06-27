@@ -14,7 +14,15 @@ from translations import t, get_current_language, set_language, get_available_la
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dns_manager.db'
+
+# Путь к базе данных в instance директории (для Docker volume)
+instance_path = os.path.join(os.path.dirname(__file__), 'instance')
+if not os.path.exists(instance_path):
+    os.makedirs(instance_path)
+    print(f"Создана директория: {instance_path}")
+print(f"Путь к базе данных: {instance_path}")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "dns_manager.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -831,10 +839,34 @@ def init_scheduler():
     
     logger.info(f"Планировщик запущен с {len(configs)} активными задачами")
 
-if __name__ == '__main__':
+def init_database():
+    """Инициализация базы данных с дополнительными проверками"""
     with app.app_context():
-        db.create_all()
-        create_default_user()
+        try:
+            # Принудительно создаем все таблицы
+            db.create_all()
+            print("База данных инициализирована")
+            
+            # Проверяем что таблицы действительно созданы
+            inspector = db.inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"Созданные таблицы: {tables}")
+            
+            # Создаем пользователя по умолчанию
+            create_default_user()
+            
+        except Exception as e:
+            print(f"Ошибка инициализации базы данных: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+if __name__ == '__main__':
+    # Инициализируем базу данных
+    init_database()
+    
+    with app.app_context():
+        # Инициализируем планировщик
         init_scheduler()
     
     app.run(host='0.0.0.0', port=4545, debug=False) 

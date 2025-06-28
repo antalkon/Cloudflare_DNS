@@ -81,10 +81,60 @@
                         </div>
                     </div>
 
+                    <!-- Дополнительные настройки -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-cog me-1"></i>Дополнительные настройки Cloudflare
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="proxy_status" class="form-label">
+                                            <i class="fas fa-shield-alt me-1"></i>Проксирование
+                                        </label>
+                                        <select class="form-select" id="proxy_status" name="proxy_status">
+                                            <option value="auto">Авто (не изменять)</option>
+                                            <option value="on">Включено</option>
+                                            <option value="off">Отключено</option>
+                                        </select>
+                                        <div class="form-text">
+                                            Проксирование трафика через Cloudflare
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="ttl" class="form-label">
+                                            <i class="fas fa-clock me-1"></i>TTL (секунды)
+                                        </label>
+                                        <select class="form-select" id="ttl" name="ttl">
+                                            <option value="">Авто (1 секунда)</option>
+                                            <option value="60">1 минута</option>
+                                            <option value="300">5 минут</option>
+                                            <option value="900">15 минут</option>
+                                            <option value="1800">30 минут</option>
+                                            <option value="3600">1 час</option>
+                                            <option value="7200">2 часа</option>
+                                            <option value="18000">5 часов</option>
+                                            <option value="43200">12 часов</option>
+                                            <option value="86400">24 часа</option>
+                                        </select>
+                                        <div class="form-text">
+                                            Время жизни DNS записи в кэше
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Совет:</strong> Для DDNS URL сервер должен возвращать IP адрес в виде текста или JSON 
-                        с полями "ip" или "address".
+                        с полями "ip" или "address". При включенном проксировании TTL автоматически устанавливается в 1 секунду.
                     </div>
                 </form>
             </div>

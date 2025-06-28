@@ -81,6 +81,56 @@
                         </div>
                     </div>
 
+                    <!-- Дополнительные настройки -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-cog me-1"></i>Дополнительные настройки Cloudflare
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="proxy_status" class="form-label">
+                                            <i class="fas fa-shield-alt me-1"></i>Проксирование
+                                        </label>
+                                        <select class="form-select" id="proxy_status" name="proxy_status">
+                                            <option value="auto" {{ 'selected' if config.proxy_status == 'auto' else '' }}>Авто (не изменять)</option>
+                                            <option value="on" {{ 'selected' if config.proxy_status == 'on' else '' }}>Включено</option>
+                                            <option value="off" {{ 'selected' if config.proxy_status == 'off' else '' }}>Отключено</option>
+                                        </select>
+                                        <div class="form-text">
+                                            Проксирование трафика через Cloudflare
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="ttl" class="form-label">
+                                            <i class="fas fa-clock me-1"></i>TTL (секунды)
+                                        </label>
+                                        <select class="form-select" id="ttl" name="ttl">
+                                            <option value="" {{ 'selected' if not config.ttl else '' }}>Авто (1 секунда)</option>
+                                            <option value="60" {{ 'selected' if config.ttl == 60 else '' }}>1 минута</option>
+                                            <option value="300" {{ 'selected' if config.ttl == 300 else '' }}>5 минут</option>
+                                            <option value="900" {{ 'selected' if config.ttl == 900 else '' }}>15 минут</option>
+                                            <option value="1800" {{ 'selected' if config.ttl == 1800 else '' }}>30 минут</option>
+                                            <option value="3600" {{ 'selected' if config.ttl == 3600 else '' }}>1 час</option>
+                                            <option value="7200" {{ 'selected' if config.ttl == 7200 else '' }}>2 часа</option>
+                                            <option value="18000" {{ 'selected' if config.ttl == 18000 else '' }}>5 часов</option>
+                                            <option value="43200" {{ 'selected' if config.ttl == 43200 else '' }}>12 часов</option>
+                                            <option value="86400" {{ 'selected' if config.ttl == 86400 else '' }}>24 часа</option>
+                                        </select>
+                                        <div class="form-text">
+                                            Время жизни DNS записи в кэше
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 

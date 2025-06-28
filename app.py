@@ -99,6 +99,8 @@ class DNSConfig(db.Model):
     last_ip = db.Column(db.String(45), nullable=True)
     last_update = db.Column(db.DateTime, nullable=True)
     ddns_url = db.Column(db.String(500), nullable=True)  # URL для DDNS проверки
+    proxy_status = db.Column(db.String(10), nullable=False, default='auto')  # auto, on, off
+    ttl = db.Column(db.Integer, nullable=True, default=None)  # None для auto, или секунды
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -117,6 +119,8 @@ class DNSConfig(db.Model):
             'last_ip': self.last_ip,
             'last_update': self.last_update.isoformat() if self.last_update else None,
             'ddns_url': self.ddns_url,
+            'proxy_status': self.proxy_status,
+            'ttl': self.ttl,
             'created_at': self.created_at.isoformat()
         }
 
@@ -154,15 +158,34 @@ class CloudflareAPI:
             logger.error(f"Ошибка получения DNS записей: {e}")
             return []
 
-    def update_dns_record(self, zone_id, record_id, name, ip):
+    def update_dns_record(self, zone_id, record_id, name, ip, proxy_status='auto', ttl=None):
         """Обновить DNS запись"""
         try:
             data = {
                 "type": "A",
                 "name": name,
-                "content": ip,
-                "ttl": 120  # Короткий TTL для динамических IP
+                "content": ip
             }
+            
+            # TTL настройки
+            if ttl is None:
+                data["ttl"] = 1  # Auto TTL
+            else:
+                data["ttl"] = ttl
+            
+            # Proxy настройки
+            if proxy_status == 'auto':
+                # Получаем текущие настройки записи
+                current_record = self.get_dns_record_by_id(zone_id, record_id)
+                if current_record:
+                    data["proxied"] = current_record.get('proxied', False)
+                else:
+                    data["proxied"] = False
+            elif proxy_status == 'on':
+                data["proxied"] = True
+                data["ttl"] = 1  # Проксированные записи должны иметь TTL = 1
+            else:  # off
+                data["proxied"] = False
             
             response = requests.put(f"{self.base_url}/zones/{zone_id}/dns_records/{record_id}",
                                   headers=self.headers, json=data)
@@ -172,15 +195,29 @@ class CloudflareAPI:
             logger.error(f"Ошибка обновления DNS записи: {e}")
             return False
 
-    def create_dns_record(self, zone_id, name, ip):
+    def create_dns_record(self, zone_id, name, ip, proxy_status='auto', ttl=None):
         """Создать новую DNS запись"""
         try:
             data = {
                 "type": "A",
                 "name": name,
-                "content": ip,
-                "ttl": 120
+                "content": ip
             }
+            
+            # TTL настройки
+            if ttl is None:
+                data["ttl"] = 1  # Auto TTL
+            else:
+                data["ttl"] = ttl
+            
+            # Proxy настройки
+            if proxy_status == 'on':
+                data["proxied"] = True
+                data["ttl"] = 1  # Проксированные записи должны иметь TTL = 1
+            elif proxy_status == 'off':
+                data["proxied"] = False
+            else:  # auto
+                data["proxied"] = False  # По умолчанию не проксируем новые записи
             
             response = requests.post(f"{self.base_url}/zones/{zone_id}/dns_records",
                                    headers=self.headers, json=data)
@@ -189,6 +226,17 @@ class CloudflareAPI:
         except Exception as e:
             logger.error(f"Ошибка создания DNS записи: {e}")
             return False
+    
+    def get_dns_record_by_id(self, zone_id, record_id):
+        """Получить конкретную DNS запись по ID"""
+        try:
+            response = requests.get(f"{self.base_url}/zones/{zone_id}/dns_records/{record_id}",
+                                  headers=self.headers)
+            response.raise_for_status()
+            return response.json()['result']
+        except Exception as e:
+            logger.error(f"Ошибка получения DNS записи: {e}")
+            return None
 
 def get_current_ip():
     """Получить текущий внешний IP адрес"""
@@ -323,10 +371,12 @@ def update_dns_record(config_id):
         if records:
             # Обновляем существующую запись
             record = records[0]
-            success = cf_api.update_dns_record(target_zone['id'], record['id'], record_name, current_ip)
+            success = cf_api.update_dns_record(target_zone['id'], record['id'], record_name, current_ip,
+                                             config.proxy_status, config.ttl)
         else:
             # Создаем новую запись
-            success = cf_api.create_dns_record(target_zone['id'], record_name, current_ip)
+            success = cf_api.create_dns_record(target_zone['id'], record_name, current_ip,
+                                             config.proxy_status, config.ttl)
 
         if success:
             config.last_ip = current_ip
@@ -527,6 +577,8 @@ def create_config():
             subdomain=data.get('subdomain'),
             update_interval=data.get('update_interval', 30),
             ddns_url=data.get('ddns_url'),
+            proxy_status=data.get('proxy_status', 'auto'),
+            ttl=data.get('ttl'),
             user_id=user.id
         )
         
@@ -534,13 +586,7 @@ def create_config():
         db.session.commit()
 
         # Добавляем задачу в планировщик
-        scheduler.add_job(
-            func=update_dns_record,
-            trigger=IntervalTrigger(minutes=config.update_interval),
-            args=[config.id],
-            id=f'dns_update_{config.id}',
-            replace_existing=True
-        )
+        add_scheduler_job(config)
 
         return jsonify(config.to_dict()), 201
 
@@ -575,25 +621,18 @@ def update_config(config_id):
             config.update_interval = data['update_interval']
         if 'ddns_url' in data:
             config.ddns_url = data['ddns_url']
+        if 'proxy_status' in data:
+            config.proxy_status = data['proxy_status']
+        if 'ttl' in data:
+            config.ttl = data['ttl']
         if 'is_active' in data:
             config.is_active = data['is_active']
 
         db.session.commit()
 
-        # Перезапускаем задачу в планировщике
-        try:
-            scheduler.remove_job(f'dns_update_{config.id}')
-        except:
-            pass
-
-        if config.is_active:
-            scheduler.add_job(
-                func=update_dns_record,
-                trigger=IntervalTrigger(minutes=config.update_interval),
-                args=[config.id],
-                id=f'dns_update_{config.id}',
-                replace_existing=True
-            )
+        # Обновляем задачу в планировщике
+        remove_scheduler_job(config.id)
+        add_scheduler_job(config)
 
         return jsonify(config.to_dict())
 
@@ -609,10 +648,7 @@ def delete_config(config_id):
         config = DNSConfig.query.filter_by(id=config_id, user_id=user.id).first_or_404()
         
         # Удаляем задачу из планировщика
-        try:
-            scheduler.remove_job(f'dns_update_{config.id}')
-        except:
-            pass
+        remove_scheduler_job(config.id)
 
         db.session.delete(config)
         db.session.commit()
@@ -876,21 +912,138 @@ def test_ddns():
 
 def init_scheduler():
     """Инициализация планировщика задач"""
-    scheduler.start()
-    
-    # Загружаем все активные конфигурации и добавляем задачи
-    configs = DNSConfig.query.filter_by(is_active=True).all()
-    for config in configs:
-        if config.token and config.token.is_active:
-            scheduler.add_job(
-                func=update_dns_record,
-                trigger=IntervalTrigger(minutes=config.update_interval),
-                args=[config.id],
-                id=f'dns_update_{config.id}',
-                replace_existing=True
-            )
-    
-    logger.info(f"Планировщик запущен с {len(configs)} активными задачами")
+    try:
+        if not scheduler.running:
+            scheduler.start()
+            print("Планировщик запущен")
+        
+        # Загружаем все активные конфигурации и добавляем задачи
+        configs = DNSConfig.query.filter_by(is_active=True).all()
+        active_configs = []
+        
+        for config in configs:
+            if config.token and config.token.is_active:
+                try:
+                    job_id = f'dns_update_{config.id}'
+                    
+                    # Удаляем старую задачу если есть
+                    try:
+                        scheduler.remove_job(job_id)
+                    except:
+                        pass
+                    
+                    # Добавляем новую задачу
+                    scheduler.add_job(
+                        func=scheduler_update_dns,
+                        trigger=IntervalTrigger(minutes=config.update_interval),
+                        args=[config.id],
+                        id=job_id,
+                        replace_existing=True,
+                        max_instances=1
+                    )
+                    active_configs.append(config)
+                    print(f"Добавлена задача для {config.domain} (каждые {config.update_interval} мин)")
+                except Exception as e:
+                    print(f"Ошибка добавления задачи для конфигурации {config.id}: {e}")
+        
+        print(f"Планировщик запущен с {len(active_configs)} активными задачами")
+        logger.info(f"Планировщик запущен с {len(active_configs)} активными задачами")
+        
+    except Exception as e:
+        print(f"Ошибка инициализации планировщика: {e}")
+        logger.error(f"Ошибка инициализации планировщика: {e}")
+
+def scheduler_update_dns(config_id):
+    """Обертка для обновления DNS в планировщике"""
+    try:
+        with app.app_context():
+            print(f"Планировщик: обновление DNS для конфигурации {config_id}")
+            result = update_dns_record(config_id)
+            if result:
+                print(f"Планировщик: DNS успешно обновлен для конфигурации {config_id}")
+            else:
+                print(f"Планировщик: Ошибка обновления DNS для конфигурации {config_id}")
+    except Exception as e:
+        print(f"Планировщик: Критическая ошибка для конфигурации {config_id}: {e}")
+        logger.error(f"Планировщик: Критическая ошибка для конфигурации {config_id}: {e}")
+
+def add_scheduler_job(config):
+    """Добавить задачу в планировщик"""
+    try:
+        if not config.is_active or not config.token or not config.token.is_active:
+            return
+            
+        job_id = f'dns_update_{config.id}'
+        
+        # Удаляем старую задачу если есть
+        try:
+            scheduler.remove_job(job_id)
+        except:
+            pass
+        
+        # Добавляем новую задачу
+        scheduler.add_job(
+            func=scheduler_update_dns,
+            trigger=IntervalTrigger(minutes=config.update_interval),
+            args=[config.id],
+            id=job_id,
+            replace_existing=True,
+            max_instances=1
+        )
+        print(f"Добавлена задача для {config.domain} (каждые {config.update_interval} мин)")
+        
+    except Exception as e:
+        print(f"Ошибка добавления задачи для конфигурации {config.id}: {e}")
+        logger.error(f"Ошибка добавления задачи для конфигурации {config.id}: {e}")
+
+def remove_scheduler_job(config_id):
+    """Удалить задачу из планировщика"""
+    try:
+        job_id = f'dns_update_{config_id}'
+        scheduler.remove_job(job_id)
+        print(f"Удалена задача для конфигурации {config_id}")
+    except Exception as e:
+        if "No job by the id" not in str(e):
+            print(f"Ошибка удаления задачи для конфигурации {config_id}: {e}")
+            logger.error(f"Ошибка удаления задачи для конфигурации {config_id}: {e}")
+
+@app.route('/api/scheduler/status')
+@login_required
+def scheduler_status():
+    """Статус планировщика"""
+    try:
+        jobs = []
+        if scheduler.running:
+            for job in scheduler.get_jobs():
+                jobs.append({
+                    'id': job.id,
+                    'name': str(job.func),
+                    'trigger': str(job.trigger),
+                    'next_run': job.next_run_time.isoformat() if job.next_run_time else None
+                })
+        
+        return jsonify({
+            'running': scheduler.running,
+            'jobs_count': len(jobs),
+            'jobs': jobs
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/scheduler/restart', methods=['POST'])
+@admin_required  
+def restart_scheduler():
+    """Перезапуск планировщика"""
+    try:
+        if scheduler.running:
+            scheduler.shutdown()
+        
+        init_scheduler()
+        
+        return jsonify({'message': 'Планировщик перезапущен'})
+    except Exception as e:
+        logger.error(f"Ошибка перезапуска планировщика: {e}")
+        return jsonify({'error': str(e)}), 500
 
 def init_database():
     """Инициализация базы данных с дополнительными проверками"""
@@ -918,8 +1071,9 @@ if __name__ == '__main__':
     # Инициализируем базу данных
     init_database()
     
+    # Инициализируем планировщик в контексте приложения
     with app.app_context():
-        # Инициализируем планировщик
         init_scheduler()
     
-    app.run(host='0.0.0.0', port=4545, debug=False) 
+    # Запускаем веб-сервер
+    app.run(host='0.0.0.0', port=4545, debug=False, threaded=True) 

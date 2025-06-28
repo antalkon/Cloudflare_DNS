@@ -9,6 +9,11 @@
         <button class="btn btn-outline-info btn-sm" onclick="checkScheduler()" id="scheduler-btn">
             <i class="fas fa-clock me-1"></i>Планировщик
         </button>
+        {% if session.get('is_admin') %}
+        <button class="btn btn-outline-warning btn-sm" onclick="restartScheduler()">
+            <i class="fas fa-redo me-1"></i>Перезапустить
+        </button>
+        {% endif %}
         <a href="{{ url_for('add_config') }}" class="btn btn-primary">
             <i class="fas fa-plus me-2"></i>{{ t('add_domain') }}
         </a>
@@ -74,6 +79,14 @@
                             {{ config.last_update.strftime('%d.%m.%Y %H:%M') if config.last_update else t('never') }}
                         </span>
                     </div>
+                    {% if config.is_active %}
+                    <div class="mb-2">
+                        <small class="text-muted">Следующее обновление</small><br>
+                        <span class="timestamp next-update" data-next-update="{{ config.id }}">
+                            <i class="fas fa-spinner fa-spin"></i> Загрузка...
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="card-footer bg-transparent">
                     <div class="btn-group w-100" role="group">
@@ -208,6 +221,14 @@ function checkScheduler() {
         if (data.running) {
             showNotification(`Планировщик работает. Задач: ${data.jobs_count}`, 'success');
             btn.className = 'btn btn-outline-success btn-sm';
+            
+            // Показываем детали задач
+            if (data.jobs && data.jobs.length > 0) {
+                const jobsInfo = data.jobs.map(job => 
+                    `${job.id}: ${job.next_run ? new Date(job.next_run).toLocaleString('ru-RU') : 'не запланирован'}`
+                ).join('\n');
+                console.log('Активные задачи планировщика:\n' + jobsInfo);
+            }
         } else {
             showNotification('Планировщик не работает!', 'danger');
             btn.className = 'btn btn-outline-danger btn-sm';
@@ -222,6 +243,99 @@ function checkScheduler() {
         btn.disabled = false;
     });
 }
+
+// Перезапуск планировщика (только для админов)
+function restartScheduler() {
+    if (!confirm('Перезапустить планировщик? Это может временно прервать автоматические обновления.')) {
+        return;
+    }
+    
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Перезапуск...';
+    btn.disabled = true;
+    
+    fetch('/api/scheduler/restart', { method: 'POST' })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'danger');
+        } else {
+            showNotification('Планировщик перезапущен', 'success');
+            // Обновляем статус через секунду
+            setTimeout(checkScheduler, 1000);
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка перезапуска планировщика', 'danger');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Загрузка времени следующего обновления
+function loadNextUpdateTimes() {
+    fetch('/api/configs')
+    .then(response => response.json())
+    .then(configs => {
+        configs.forEach(config => {
+            const element = document.querySelector(`[data-next-update="${config.id}"]`);
+            if (element && config.next_update) {
+                const nextUpdate = new Date(config.next_update);
+                const now = new Date();
+                const timeDiff = nextUpdate - now;
+                
+                if (timeDiff > 0) {
+                    const minutes = Math.floor(timeDiff / 60000);
+                    const seconds = Math.floor((timeDiff % 60000) / 1000);
+                    
+                    if (minutes > 0) {
+                        element.innerHTML = `через ${minutes} мин ${seconds} сек`;
+                    } else {
+                        element.innerHTML = `через ${seconds} сек`;
+                    }
+                } else {
+                    element.innerHTML = 'сейчас';
+                }
+            } else if (element) {
+                element.innerHTML = 'не запланировано';
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Ошибка загрузки времени обновления:', error);
+    });
+}
+
+// Форматирование даты для устранения "Invalid Date"
+function formatDate(dateString) {
+    if (!dateString) return 'никогда';
+    
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'неверная дата';
+        
+        return date.toLocaleString('ru-RU', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return 'ошибка формата';
+    }
+}
+
+// Загружаем время обновления при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadNextUpdateTimes();
+    
+    // Обновляем время каждые 5 секунд
+    setInterval(loadNextUpdateTimes, 5000);
+});
 
 // Автообновление страницы каждые 30 секунд
 setInterval(() => {

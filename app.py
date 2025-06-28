@@ -108,6 +108,7 @@ class DNSConfig(db.Model):
     user = db.relationship('User', backref=db.backref('dns_configs', lazy=True))
 
     def to_dict(self):
+        next_update = self.get_next_update_time()
         return {
             'id': self.id,
             'token_id': self.token_id,
@@ -118,11 +119,24 @@ class DNSConfig(db.Model):
             'is_active': self.is_active,
             'last_ip': self.last_ip,
             'last_update': self.last_update.isoformat() if self.last_update else None,
+            'next_update': next_update.isoformat() if next_update else None,
             'ddns_url': self.ddns_url,
             'proxy_status': self.proxy_status,
             'ttl': self.ttl,
             'created_at': self.created_at.isoformat()
         }
+    
+    def get_next_update_time(self):
+        """Получить время следующего обновления из планировщика"""
+        try:
+            from app import scheduler
+            job_id = f'dns_update_{self.id}'
+            job = scheduler.get_job(job_id)
+            if job and job.next_run_time:
+                return job.next_run_time
+        except:
+            pass
+        return None
 
 class CloudflareAPI:
     def __init__(self, token):
@@ -585,9 +599,17 @@ def create_config():
         db.session.add(config)
         db.session.commit()
 
-        # Добавляем задачу в планировщик
+                # Добавляем задачу в планировщик
         add_scheduler_job(config)
-
+        
+        # Выполняем первое обновление сразу
+        if config.is_active:
+            try:
+                print(f"Выполняем первое обновление для новой конфигурации {config.id}")
+                update_dns_record(config.id)
+            except Exception as e:
+                print(f"Ошибка первого обновления: {e}")
+        
         return jsonify(config.to_dict()), 201
 
     except Exception as e:
@@ -957,20 +979,32 @@ def scheduler_update_dns(config_id):
     """Обертка для обновления DNS в планировщике"""
     try:
         with app.app_context():
-            print(f"Планировщик: обновление DNS для конфигурации {config_id}")
+            from datetime import datetime
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Планировщик: обновление DNS для конфигурации {config_id}")
+            
+            # Проверяем что конфигурация еще активна
+            config = DNSConfig.query.get(config_id)
+            if not config or not config.is_active:
+                print(f"Планировщик: Конфигурация {config_id} неактивна или удалена")
+                return
+                
             result = update_dns_record(config_id)
             if result:
-                print(f"Планировщик: DNS успешно обновлен для конфигурации {config_id}")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Планировщик: DNS успешно обновлен для конфигурации {config_id}")
             else:
-                print(f"Планировщик: Ошибка обновления DNS для конфигурации {config_id}")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Планировщик: Ошибка обновления DNS для конфигурации {config_id}")
     except Exception as e:
-        print(f"Планировщик: Критическая ошибка для конфигурации {config_id}: {e}")
+        from datetime import datetime
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Планировщик: Критическая ошибка для конфигурации {config_id}: {e}")
         logger.error(f"Планировщик: Критическая ошибка для конфигурации {config_id}: {e}")
+        import traceback
+        traceback.print_exc()
 
 def add_scheduler_job(config):
     """Добавить задачу в планировщик"""
     try:
         if not config.is_active or not config.token or not config.token.is_active:
+            print(f"Конфигурация {config.id} неактивна или токен недоступен")
             return
             
         job_id = f'dns_update_{config.id}'
@@ -978,11 +1012,12 @@ def add_scheduler_job(config):
         # Удаляем старую задачу если есть
         try:
             scheduler.remove_job(job_id)
+            print(f"Удалена старая задача {job_id}")
         except:
             pass
         
         # Добавляем новую задачу
-        scheduler.add_job(
+        job = scheduler.add_job(
             func=scheduler_update_dns,
             trigger=IntervalTrigger(minutes=config.update_interval),
             args=[config.id],
@@ -991,10 +1026,13 @@ def add_scheduler_job(config):
             max_instances=1
         )
         print(f"Добавлена задача для {config.domain} (каждые {config.update_interval} мин)")
+        print(f"Следующий запуск: {job.next_run_time}")
         
     except Exception as e:
         print(f"Ошибка добавления задачи для конфигурации {config.id}: {e}")
         logger.error(f"Ошибка добавления задачи для конфигурации {config.id}: {e}")
+        import traceback
+        traceback.print_exc()
 
 def remove_scheduler_job(config_id):
     """Удалить задачу из планировщика"""
